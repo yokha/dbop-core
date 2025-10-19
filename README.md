@@ -3,17 +3,17 @@
 [![Build Status](https://github.com/yokha/dbop-core/actions/workflows/ci.yml/badge.svg)](https://github.com/yokha/dbop-core/actions)
 [![Coverage Status](https://img.shields.io/codecov/c/github/yokha/dbop-core.svg)](https://codecov.io/gh/yokha/dbop-core)
 
-
-**DB-agnostic retry runner** for Python database operations.
+**DB-agnostic retry runner** for Python database operations.  
 You bring the driver or ORM — `dbop-core` gives you:
 
 * **Retries with backoff and jitter**
 * **Attempt scopes** (transaction / SAVEPOINT wrappers)
 * **Per-attempt hooks** (e.g. set timeouts, apply metadata)
 * **Transient error classification**
+* **Optional OTLP traces + metrics via OpenTelemetry**
 
-Lightweight and composable — the core doesn’t know your driver.
-Adapters live under `contrib/` (SQLAlchemy, psycopg, asyncpg, aiomysql, aiosqlite, and generic DB-API).
+Lightweight and composable — the core doesn’t know your driver.  
+Adapters live under `contrib/` (SQLAlchemy, psycopg, asyncpg, aiomysql, aiosqlite, generic DB-API).
 
 ---
 
@@ -37,6 +37,9 @@ It’s not a migration tool or pooler — just a precise **execution runner** fo
 * 🧩 **Attempt scopes**: pluggable context managers (transaction/savepoint)
 * ⚙️ **Per-attempt hooks**: run custom setup (timeouts, instrumentation)
 * 🧠 **Transient classifier**: decide whether an exception should retry
+* 📈 **Optional OTLP observability**:
+  * Traces (spans per operation + attempt)
+  * Metrics (counters + histograms) via OpenTelemetry
 
 ---
 
@@ -51,7 +54,10 @@ pip install "dbop-core[psycopg]"
 pip install "dbop-core[asyncpg]"
 pip install "dbop-core[aiomysql]"
 pip install "dbop-core[aiosqlite]"
-```
+
+# optional OTEL support (traces + metrics)
+pip install "dbop-core[otel]"
+````
 
 **Compatibility:** Python 3.9 – 3.13
 
@@ -93,10 +99,12 @@ await execute(
 **Semantics**
 
 * Only exceptions in `retry_on` are candidates for retry.
-* If `classifier` is provided, it takes precedence per exception (`True` → retry, `False` → stop).
+* If `classifier` is provided, it takes precedence per exception (`True` -> retry, `False` -> stop).
 * `overall_timeout_s` cancels the attempt; if `raises=False`, you get `default`.
 * `pre_attempt` is always async — even for sync drivers (wrap your sync setup with `async def pre(): ...`).
+
 ---
+
 ### Execution Flow (Conceptual Diagram)
 
 Below is a simplified view of what happens inside `execute()` during retries.
@@ -128,13 +136,13 @@ Below is a simplified view of what happens inside `execute()` during retries.
             ├─► [3.3] call op(*args, **kwargs)
             │        (sync or async function)
             │
-            ├─► [3.4] if success → return result
+            ├─► [3.4] if success -> return result
             │
             ├─► [3.5] if exception:
             │       ├─ check type in retry_on
             │       ├─ run classifier(exc)
-            │       ├─ if transient → sleep(backoff) → retry
-            │       └─ else → re-raise (or return default)
+            │       ├─ if transient -> sleep(backoff) -> retry
+            │       └─ else -> re-raise (or return default)
             │
             ▼
     [4] if all retries failed:
@@ -144,8 +152,7 @@ Below is a simplified view of what happens inside `execute()` during retries.
 
 **Key concepts:**
 
-* `attempt_scope` isolates one DB operation (transaction or savepoint).
-  If the attempt fails, the scope rolls back and prepares for retry.
+* `attempt_scope` isolates one DB operation (transaction or savepoint). If the attempt fails, the scope rolls back and prepares for retry.
 * `pre_attempt` runs before each try — perfect for **timeouts**, **instrumentation**, or **context tagging**.
 * `RetryPolicy` determines how long to wait and how many times to retry.
 
@@ -211,25 +218,33 @@ Session = sessionmaker(bind=engine)
 
 def setup(sess):
     sess.execute(text("CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)"))
+
 def put(sess, k, v):
     sess.execute(text("INSERT OR REPLACE INTO kv VALUES (:k,:v)"), {"k": k, "v": v})
+
 def get(sess, k):
     return sess.execute(text("SELECT v FROM kv WHERE k=:k"), {"k": k}).scalar()
 
 async def main():
     pol = RetryPolicy(max_retries=3, initial_delay=0.05, max_delay=0.2)
     with Session() as sess:
-        with sess.begin(): setup(sess)
+        with sess.begin():
+            setup(sess)
 
         with sess.begin():
-            await execute(lambda: put(sess, "hello", "world"),
+            await execute(
+                lambda: put(sess, "hello", "world"),
                 attempt_scope=lambda r=False: attempt_scope_sync(sess, read_only=r),
-                policy=pol)
+                policy=pol,
+            )
 
         with sess.begin():
-            val = await execute(lambda: get(sess, "hello"),
+            val = await execute(
+                lambda: get(sess, "hello"),
                 attempt_scope=lambda r=False: attempt_scope_sync(sess, read_only=r),
-                policy=pol, read_only=True)
+                policy=pol,
+                read_only=True,
+            )
             print(val)
 
 asyncio.run(main())
@@ -268,7 +283,8 @@ async def run():
             classifier=dbapi_classifier,
             attempt_scope_async=lambda r=False: attempt_scope_async(conn, read_only=r),
             pre_attempt=partial(pre, conn),
-            policy=pol, read_only=True,
+            policy=pol,
+            read_only=True,
         )
         print("count:", count)
 ```
@@ -284,9 +300,14 @@ from dbop_core.contrib.dbapi_adapter import attempt_scope_sync, apply_timeouts_s
 
 conn = sqlite3.connect(":memory:")
 
-def create(): conn.execute("CREATE TABLE IF NOT EXISTS t(x INT)")
-def insert(): conn.execute("INSERT INTO t(x) VALUES (1)")
-def count(): return conn.execute("SELECT COUNT(*) FROM t").fetchone()[0]
+def create():
+    conn.execute("CREATE TABLE IF NOT EXISTS t(x INT)")
+
+def insert():
+    conn.execute("INSERT INTO t(x) VALUES (1)")
+
+def count():
+    return conn.execute("SELECT COUNT(*) FROM t").fetchone()[0]
 
 async def pre():
     apply_timeouts_sync(conn, backend="sqlite", lock_timeout_s=3)
@@ -295,13 +316,20 @@ async def main():
     create()
     pol = RetryPolicy(max_retries=2, initial_delay=0.05, max_delay=0.2)
 
-    await execute(lambda: insert(),
+    await execute(
+        lambda: insert(),
         attempt_scope=lambda r=False: attempt_scope_sync(conn, read_only=r, backend="sqlite"),
-        pre_attempt=pre, policy=pol)
+        pre_attempt=pre,
+        policy=pol,
+    )
 
-    n = await execute(lambda: count(),
+    n = await execute(
+        lambda: count(),
         attempt_scope=lambda r=False: attempt_scope_sync(conn, read_only=True, backend="sqlite"),
-        pre_attempt=pre, policy=pol, read_only=True)
+        pre_attempt=pre,
+        policy=pol,
+        read_only=True,
+    )
     print("rows:", n)
 
 asyncio.run(main())
@@ -341,29 +369,89 @@ You can always plug in your own classifier:
 
 ```bash
 cd examples
-cp .env.sample .env  # configure DSNs
+cp env.example .env  # configure DSNs
 
 # SQLite (local)
-make install-sqlite-local && make run-sqlite
+make install-sqlite && make run-sqlite
 
 # Postgres (Docker)
-make pg-up && make install-psycopg-local && make run-psycopg
-make install-asyncpg-local && make run-asyncpg
+make pg-up && make install-psycopg && make run-psycopg
+make install-asyncpg && make run-asyncpg
 make pg-down
 
 # MySQL (Docker)
-make mysql-up && make install-mysql-local && make run-mysql
+make mysql-up && make install-mysql && make run-mysql
 make mysql-down
+
+# OTEL (Collector + Jaeger + Prometheus + Grafana)
+make otel-up
+make otel-smoke-local-http    # or make otel-smoke-local-grpc
 ```
+
+More details in [`examples/README.md`](examples/README.md).
 
 ---
 
-## Roadmap
+## Observability (OTLP / OpenTelemetry)
 
-* OTLP tracing (spans around retries)
-* Instrumentation hooks (OpenTelemetry / Prometheus)
-* More contrib adapters (`databases`, `gino`, etc.)
-* Extended cookbook examples
+`dbop-core` optionally emits **OpenTelemetry traces and metrics** for every execution:
+
+### Traces
+
+When OTEL is enabled, `execute_traced_optional()`:
+
+* Creates a **root span** for each logical DB operation.
+* Wraps each retry in an **attempt span**.
+* Adds attributes such as:
+
+  * `dbop.max_retries`, `dbop.initial_delay`, `dbop.max_delay`, `dbop.jitter`
+  * `dbop.outcome` (`success` / `error`)
+  * `db.system`, `db.name`, `db.user`, `db.statement`
+* Emits events `dbop.pre_attempt` for each attempt.
+
+### Metrics
+
+The OTEL metrics layer exposes (via the Collector → Prometheus):
+
+* `dbop_dbop_operations_total` — number of DB operations
+* `dbop_dbop_attempts_total` — number of attempts (including retries)
+* `dbop_dbop_operation_duration_seconds` — latency histogram
+
+Metrics are labelled with backend + outcome attributes, so you can break down:
+
+* Read-only vs non-read-only
+* Success vs failure
+* Per-DB system / database
+
+### Enabling OTEL
+
+Install extras:
+
+```bash
+pip install "dbop-core[otel]"
+```
+
+Minimal env setup:
+
+```bash
+export DBOP_OTEL_ENABLED=1
+export DBOP_OTEL_EXPORTER=http   # or grpc
+
+# typical HTTP endpoints (with an OTEL Collector running locally)
+export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
+export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:4318/v1/metrics
+```
+
+Then use `init_tracer` / `init_metrics` and `execute_traced_optional()` (see `docs/OTEL.md`).
+
+### Learn more
+
+See **[docs/OTEL.md](docs/OTEL.md)** for:
+
+* Design & structure (`otel_setup`, `otel_runtime`)
+* Env variable matrix
+* Example `docker-compose` for Collector + Jaeger + Prometheus + Grafana
+* The OTEL smoke demo (`examples/otel-smoke/`)
 
 ---
 
@@ -384,4 +472,3 @@ MIT
 **Youssef Khaya**
 [LinkedIn](https://www.linkedin.com/in/youssef-khaya-88a1a128)
 [GitHub](https://github.com/yokha/dbop-core)
----

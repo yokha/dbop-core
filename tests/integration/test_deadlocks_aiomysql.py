@@ -1,4 +1,3 @@
-# tests/integration/test_deadlocks_aiomysql.py
 from __future__ import annotations
 
 import asyncio
@@ -148,6 +147,6 @@ async def test_deadlock_is_retried_aiomysql(mysql_conn_pair):
     # One side is the victim: both rows changed equally; either once (t1 victim) or twice (t2 victim -> retried)
     assert v1 == v2 and v1 in (1, 2)
     # And we actually exercised a deadlock path
-    assert t1_deadlocked or t2_attempts > 1, (
-        f"Expected t1 deadlock or t2 retry; got t1_deadlocked={t1_deadlocked}, t2_attempts={t2_attempts}"
-    )
+    assert (
+        t1_deadlocked or t2_attempts > 1
+    ), f"Expected t1 deadlock or t2 retry; got t1_deadlocked={t1_deadlocked}, t2_attempts={t2_attempts}"

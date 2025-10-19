@@ -1,6 +1,7 @@
 import pytest
 from dbop_core.contrib.aiosqlite_adapter import attempt_scope_async
 
+
 class ConnBoomOnRollback:
     def __init__(self):
         self.sql = []
@@ -23,10 +24,14 @@ class ConnBoomOnRollback:
         # make rollback itself fail so the adapter's suppress(Exception) is covered
         raise RuntimeError("outer rollback failed")
 
+
 @pytest.mark.asyncio
 async def test_aiosqlite_outer_rollback_is_suppressed():
     c = ConnBoomOnRollback()
-    class Boom(Exception): pass
+
+    class Boom(Exception):
+        pass
+
     with pytest.raises(Boom):
         async with attempt_scope_async(c, read_only=False):
             # trigger the exception path inside the scope

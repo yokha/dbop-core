@@ -19,6 +19,11 @@ help:
 	@echo "  install-asyncpg        Install deps for asyncpg example"
 	@echo "  run-asyncpg            Run asyncpg example (needs Postgres up + .env)"
 	@echo "  clean-venv             Remove examples venv"
+	@echo "  otel-up                Start OTEL collector + Jaeger"
+	@echo "  otel-down              Stop OTEL collector + Jaeger"
+	@echo "  otel-smoke-local-http  Run OTEL smoke test (HTTP OTLP, :4318)"
+	@echo "  otel-smoke-local-grpc  Run OTEL smoke test (gRPC OTLP, :4317)"
+
 
 .PHONY: venv
 venv:
@@ -159,3 +164,56 @@ install-mysql-local: venv
 	$(PIP) install -U pip
 	$(PIP) install -e '$(DBOP_CORE_PATH)'
 	$(PIP) install pymysql python-dotenv cryptography
+
+# ---------- OTEL ----------
+.PHONY: otel-up otel-logs otel-down otel-smoke otel-smoke-local
+otel-up:
+	docker compose -f _compose/otel.yml up -d
+
+otel-logs:
+	docker compose -f _compose/otel.yml logs -f otel-collector
+
+otel-down:
+	docker compose -f _compose/otel.yml down -v
+
+.PHONY: otel-smoke-local
+otel-smoke-local:
+	$(PYTHON) -m venv .venv-otel && . .venv-otel/bin/activate && \
+	  .venv-otel/bin/pip install -U pip && \
+	  .venv-otel/bin/pip install -e ..[otel] && \
+	  DBOP_OTEL_ENABLED=1 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317 \
+	    .venv-otel/bin/python otel-smoke/main.py
+
+
+.PHONY: otel-smoke-local-grpc
+otel-smoke-local-grpc:
+	python3 -m venv .venv-otel && \
+	. .venv-otel/bin/activate && \
+	.venv-otel/bin/pip install -U pip && \
+	.venv-otel/bin/pip install -e ..[otel] && \
+	DBOP_OTEL_ENABLED=1 \
+	DBOP_OTEL_EXPORTER=grpc \
+	OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317 \
+	OTEL_EXPORTER_OTLP_INSECURE=true \
+	.venv-otel/bin/python otel-smoke/main.py
+
+
+.PHONY: otel-smoke-local-http
+otel-smoke-local-http:
+	python3 -m venv .venv-otel && \
+	. .venv-otel/bin/activate && \
+	.venv-otel/bin/pip install -U pip && \
+	.venv-otel/bin/pip install -e ..[otel] && \
+	DBOP_OTEL_ENABLED=1 \
+	DBOP_OTEL_EXPORTER=http \
+	OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces \
+	.venv-otel/bin/python otel-smoke/main.py
+
+
+.PHONY: otel-smoke
+otel-smoke:
+	$(PYTHON) -m venv .venv-otel && . .venv-otel/bin/activate && \
+	  .venv-otel/bin/pip install -U pip && \
+	  .venv-otel/bin/pip install -r otel-smoke/requirements.txt && \
+	  DBOP_OTEL_ENABLED=1 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 \
+	    .venv-otel/bin/python otel-smoke/main.py

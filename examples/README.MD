@@ -1,106 +1,77 @@
-# dbop-core — Examples
+# **dbop-core — Examples**
 
-Practical examples demonstrating how to use **`dbop-core`** with different Python database drivers and ORMs.
+Practical, runnable examples demonstrating how to use **`dbop-core`** with multiple databases:
 
-Includes both **sync** and **async** backends:
+* SQLite (sync + async)
+* PostgreSQL (asyncpg, psycopg)
+* MySQL / MariaDB (PyMySQL + aiomysql)
+* Full **OTLP Observability stack** (Collector + Jaeger + Prometheus + Grafana)
 
-* **SQLAlchemy + SQLite** (sync)
-* **aiosqlite + SQLite** (async)
-* **psycopg 3 + Postgres** (async)
-* **asyncpg + Postgres** (async)
-* **PyMySQL + MySQL/MariaDB** (sync)
-* **aiomysql + MySQL/MariaDB** (async)
+Each example shows:
+
+* Retries with exponential backoff
+* Attempt-scoped retries (transaction/savepoint)
+* Per-attempt timeouts
+* Transient classification
+* Optional OpenTelemetry instrumentation
 
 ---
 
-## Overview
-
-Each subfolder is a self-contained runnable example with its own `main.py` and `requirements.txt`.
-All examples share a single `Makefile` for convenience.
+# **Directory Layout**
 
 ```text
 examples/
 ├── Makefile
-├── env.example             # rename to .env for docker-based examples
-├── example.db              # local SQLite DB (used by SQLite examples)
-├── _compose/               # lightweight Docker Compose files
-│   ├── postgres.yml
-│   └── mysql.yml
+├── env.example                  # rename to .env for DB examples
+├── example.db                   # used by SQLite examples
+├── _compose/
+│   ├── postgres.yml             # Postgres via Docker
+│   ├── mysql.yml                # MySQL/MariaDB via Docker
+│   └── otel.yml                 # OTEL Collector + Jaeger + Prometheus + Grafana
 │
-├── sqlalchemy-sqlite/
+├── sqlalchemy-sqlite/           # Sync SQLite example (ORM)
 │   ├── main.py
 │   └── requirements.txt
 │
-├── aiosqlite-sqlite/
+├── aiosqlite-sqlite/            # Async SQLite example
 │   ├── main.py
 │   └── requirements.txt
 │
 ├── psycopg-postgres/
-│   ├── main.py
+│   ├── main.py                  # Async psycopg example
 │   └── requirements.txt
 │
 ├── asyncpg-postgres/
-│   ├── main.py
+│   ├── main.py                  # Async asyncpg example
 │   └── requirements.txt
 │
 ├── mysql-pymysql/
-│   ├── main.py
+│   ├── main.py                  # Sync MySQL
 │   └── requirements.txt
 │
-└── aiomysql-mysql/
-    ├── main.py
+├── aiomysql-mysql/
+│   ├── main.py                  # Async MySQL
+│   └── requirements.txt
+│
+└── otel-smoke/
+    ├── main.py                  # OTEL tracing + metrics smoke demo
+    ├── grafana/                 # Sample dashboard
+    │   └── dashboard-dbop.json
     └── requirements.txt
 ```
 
 ---
 
-## Conceptual Layout
+# **1. SQLite Examples (No Docker Required)**
 
-```text
- ┌────────────────────────────┐
- │         dbop-core          │  ← your local or installed package
- └────────────┬───────────────┘
-              │
-              ▼
-       examples/Makefile
-       ├─────────────────────────────┐
-       │                             │
-   SQLite (local)                Docker Compose services
-   ├─ sqlalchemy-sqlite          ├─ _compose/postgres.yml
-   └─ aiosqlite-sqlite           └─ _compose/mysql.yml
-       │                             │
-       ▼                             ▼
-  Runs main.py                 Launches Postgres/MySQL containers
-  directly on host             for async/sync examples
-```
-
----
-
-## Prerequisites
-
-* **Python 3.9+**
-* **Docker** (for Postgres/MySQL examples)
-* `make` (optional but recommended)
-
----
-
-## Getting Started
-
-```bash
-cd examples
-cp env.example .env    # configure ports/credentials if needed
-```
-
-### A) SQLite (no Docker required)
-
-**SQLAlchemy (sync)**
+## Sync SQLAlchemy
 
 ```bash
 make install-sqlite
 make run-sqlite
 ```
 
-**aiosqlite (async)**
+## Async aiosqlite
 
 ```bash
 make install-aiosqlite
@@ -109,22 +80,29 @@ make run-aiosqlite
 
 ---
 
-### B) Postgres (Docker)
+# **2. PostgreSQL Examples (Docker)**
 
-Start the container:
+Start Postgres:
 
 ```bash
 make pg-up
 ```
 
-Run async examples:
+Run psycopg (async):
 
 ```bash
-make install-psycopg && make run-psycopg
-make install-asyncpg && make run-asyncpg
+make install-psycopg
+make run-psycopg
 ```
 
-Tear down:
+Run asyncpg:
+
+```bash
+make install-asyncpg
+make run-asyncpg
+```
+
+Shutdown:
 
 ```bash
 make pg-down
@@ -132,22 +110,29 @@ make pg-down
 
 ---
 
-### C) MySQL / MariaDB (Docker)
+# **3. MySQL / MariaDB Examples (Docker)**
 
-Start the container:
+Start MySQL:
 
 ```bash
 make mysql-up
 ```
 
-Run examples:
+Run sync example:
 
 ```bash
-make install-mysql && make run-mysql
-make install-aiomysql && make run-aiomysql
+make install-mysql
+make run-mysql
 ```
 
-Tear down:
+Run async example:
+
+```bash
+make install-aiomysql
+make run-aiomysql
+```
+
+Shutdown:
 
 ```bash
 make mysql-down
@@ -155,115 +140,161 @@ make mysql-down
 
 ---
 
-## Environment Variables
+# **4. OpenTelemetry Smoke Demo (Traces + Metrics)**
 
-All database settings are loaded from `.env`. Defaults from `env.example`:
+The OTEL smoke demo shows:
 
-```env
-# Postgres
+* Operation spans
+* Attempt spans
+* Retry events
+* Prometheus metrics
+* Grafana dashboard
+
+## Start the full OTEL stack:
+
+```bash
+make otel-up
+```
+
+This launches:
+
+| Component      | Address                                          |
+| -------------- | ------------------------------------------------ |
+| OTEL Collector | 4317 gRPC, 4318 HTTP, 9464 Prom metrics          |
+| Jaeger UI      | [http://localhost:16686](http://localhost:16686) |
+| Prometheus     | [http://localhost:9090](http://localhost:9090)   |
+| Grafana        | [http://localhost:3000](http://localhost:3000)   |
+
+Login to Grafana:
+
+```
+user: admin
+pass: admin
+```
+
+Then import:
+
+```
+otel-smoke/grafana/dashboard-dbop.json
+```
+
+---
+
+## Run the smoke script (HTTP exporter)
+
+```bash
+make otel-smoke-local-http
+```
+
+## Or gRPC exporter:
+
+```bash
+make otel-smoke-local-grpc
+```
+
+You should see:
+
+* Traces in Jaeger → service `dbop-core-otel-smoke`
+* DB operation counters in Prometheus
+* Latency histogram + counters in Grafana
+
+---
+
+# **5. Env Variables**
+
+Copy:
+
+```bash
+cp env.example .env
+```
+
+Key values:
+
+```
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
-POSTGRES_DB=dbop
 POSTGRES_HOST=127.0.0.1
 POSTGRES_PORT=5432
-POSTGRES_DSN=postgresql://postgres:postgres@127.0.0.1:5432/dbop
+POSTGRES_DB=dbop
 
-# MySQL
-MYSQL_ROOT_PASSWORD=root
-MYSQL_DB=dbop
 MYSQL_USER=dbop
 MYSQL_PASSWORD=dbop
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
+MYSQL_DB=dbop
 ```
 
-> ⚙️ Adjust ports if they’re in use.
-> The `pg-up` and `mysql-up` targets automatically read these values.
+For OTEL:
+
+```
+DBOP_OTEL_ENABLED=1
+DBOP_OTEL_EXPORTER=http    # or grpc
+OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:4318/v1/metrics
+```
 
 ---
 
-## What Each Example Demonstrates
+# **6. What Each Example Demonstrates**
 
-* **Retries & exponential backoff** via `RetryPolicy`
-* **Attempt scopes** for transactions or SAVEPOINT retries
-* **Per-attempt timeouts**:
-
-  * PostgreSQL -> `lock_timeout`, `statement_timeout`
-  * MySQL/MariaDB -> `innodb_lock_wait_timeout`, `MAX_EXECUTION_TIME`
-  * SQLite -> `PRAGMA busy_timeout`
-* **Classifier logic** using `dbapi_classifier` to detect transient errors
-
-> `dbop_core.execute()` is always async; sync examples wrap it in `asyncio.run()`.
+| Example          | Shows                                           |
+| ---------------- | ----------------------------------------------- |
+| SQLite           | Basic retry logic, busy_timeout                 |
+| SQLAlchemy       | Nested attempt scopes via ORM transactions      |
+| psycopg          | `SET LOCAL lock_timeout`, async retries         |
+| asyncpg          | Savepoint retry strategy                        |
+| MySQL / aiomysql | `innodb_lock_wait_timeout` + MAX_EXECUTION_TIME |
+| otel-smoke       | Traces + metrics + Grafana dashboard            |
 
 ---
 
-## Run Examples Against Local Source
+# **7. Developing Locally**
 
-If developing locally, install `dbop-core` in editable mode:
+Install local source:
 
 ```bash
-# from examples/
+cd examples
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ..[sqlalchemy]
+pip install -e ..
 ```
 
-Or use:
+Or with extras:
 
 ```bash
-DBOP_CORE_PATH='..' make install-psycopg-local
+pip install -e ..[otel]
+pip install -e ..[psycopg]
 ```
 
 ---
 
-## Troubleshooting
-
-**Authentication error (MySQL 8+)**
-
-> Default plugin is `caching_sha2_password`; `PyMySQL`/`aiomysql` may need `cryptography`.
-
-Fix:
-
-```bash
-pip install cryptography
-```
-
-Or run MySQL with:
-
-```
---default-authentication-plugin=mysql_native_password
-```
-
-**Port already in use**
-
-```bash
-make pg-down && make pg-up
-# or
-make mysql-down && make mysql-up
-```
-
-**Import errors**
-Run the matching `install-*` target before execution.
-
-**Slow startup / hanging**
-Containers may still be initializing. Retry after a few seconds.
-
----
-
-## Cleanup
+# **8. Cleanup**
 
 ```bash
 make pg-down
 make mysql-down
+make otel-down
 make clean-venv
 ```
 
 ---
 
-## Explore Further
+# **9. Troubleshooting**
 
-* Try inducing deadlocks or long locks to see **retries and backoff** in action.
-* Customize `classifier(exc)` to fine-tune what counts as transient.
-* Extend examples with **custom RetryPolicy** or **OTLP tracing** once integrated.
+**MySQL auth error**
 
----
+```
+pip install cryptography
+```
+
+**Prometheus shows data but Grafana doesn’t**
+
+* Ensure Prometheus datasource is added in Grafana
+* Import the dashboard
+* Wait 5–10s (scrape interval)
+
+**Jaeger shows no traces**
+
+* Check `DBOP_OTEL_ENABLED=1`
+* Check exporter: `DBOP_OTEL_EXPORTER=http|grpc`
