@@ -1,0 +1,2 @@
+dbop-core[sqlalchemy]
+SQLAlchemy>=2,<3

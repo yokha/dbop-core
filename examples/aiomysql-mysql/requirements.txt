@@ -1,0 +1,3 @@
+dbop-core[aiomysql]
+python-dotenv
+cryptography>=42

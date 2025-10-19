@@ -1,0 +1,1 @@
+dbop-core[aiosqlite]

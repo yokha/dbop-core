@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dbop-core"
+version = "1.0.0"
+description = "DB-agnostic operation runner with retries/backoff and pluggable scopes/classifiers"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Youssef Khaya" }]
+keywords = ["retry", "backoff", "database", "resilience", "asyncio"]
+dependencies = []
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries",
+]
+
+[project.optional-dependencies]
+sqlalchemy = ["SQLAlchemy>=2,<3"]
+psycopg = ["psycopg[binary]>=3.1.8"]
+asyncpg = ["asyncpg>=0.29.0"]
+aiomysql = ["aiomysql>=0.2.0"]
+aiosqlite = ["aiosqlite>=0.19.0"]
+otel = ["opentelemetry-sdk>=1.25", "opentelemetry-exporter-otlp>=1.25"]
+dev = [
+  "pytest>=8,<9",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=4.1",
+  "coverage>=7.4",
+  "ruff>=0.6",
+  "black>=24.3",
+  "build>=1.0",
+  "twine>=5.0",
+  "tomli>=2; python_version<'3.11'",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["dbop_core*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-q"
+markers = [
+  "integration: marks tests as integration (deselect with -m 'not integration')",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E701", "E702", "F401"]
+
+[tool.black]
+line-length = 100

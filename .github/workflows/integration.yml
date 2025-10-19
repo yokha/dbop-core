@@ -1,0 +1,56 @@
+name: Integration
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  examples:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && contains(join(github.event.pull_request.labels.*.name, ','), 'integration'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: dbop_test
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dbop_test"
+          --health-interval 2s --health-timeout 2s --health-retries 25
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: dbop_test
+        ports: ["53306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval 2s --health-timeout 2s --health-retries 30
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Install dev + extras
+        run: |
+          python -m pip install -U pip
+          make install
+          .venv/bin/pip install '.[psycopg,asyncpg]' pymysql
+
+      - name: SQLite example
+        run: make test-examples-sqlite
+
+      - name: AIOSQLite example
+        run: make test-examples-aiosqlite
+
+      - name: Postgres examples
+        run: make test-examples-pg
+
+      - name: MySQL example
+        run: make test-examples-mysql

@@ -205,3 +205,20 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+# --- project-local additions ---
+# Examples env/venv
+examples/.venv/
+examples/.env
+
+# Extra local venvs
+.venv-smoke/
+.venv-*/
+
+# Build/test noise we sometimes create
+coverage.xml
+
+# Accidental files created during shell/heredoc experiments
+/importlib
+/pathlib
