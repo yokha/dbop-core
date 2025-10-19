@@ -47,6 +47,15 @@ jobs:
       - name: Tests + coverage
         run: make test-cov
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml        # path to the XML your make target produced
+          flags: unittests
+          name: ubuntu-py312
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}  # add this secret in GitHub → Settings → Secrets and variables → Actions
+
       - name: Upload coverage HTML
         if: always()
         uses: actions/upload-artifact@v4

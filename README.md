@@ -1,4 +1,8 @@
 # dbop-core
+[![PyPI version](https://img.shields.io/pypi/v/dbop-core.svg)](https://pypi.org/project/dbop-core/)
+[![Build Status](https://github.com/yokha/dbop-core/actions/workflows/ci.yml/badge.svg)](https://github.com/yokha/dbop-core/actions)
+[![Coverage Status](https://img.shields.io/codecov/c/github/yokha/dbop-core.svg)](https://codecov.io/gh/yokha/dbop-core)
+
 
 **DB-agnostic retry runner** for Python database operations.
 You bring the driver or ORM — `dbop-core` gives you:
@@ -380,17 +384,4 @@ MIT
 **Youssef Khaya**
 [LinkedIn](https://www.linkedin.com/in/youssef-khaya-88a1a128)
 [GitHub](https://github.com/yokha/dbop-core)
-
----
-
-### Optional badges for later
-
-Once you publish to PyPI and GitHub Actions:
-
-```markdown
-[![PyPI version](https://img.shields.io/pypi/v/dbop-core.svg)](https://pypi.org/project/dbop-core/)
-[![Build Status](https://github.com/yokha/dbop-core/actions/workflows/test.yml/badge.svg)](https://github.com/yokha/dbop-core/actions)
-[![Coverage Status](https://img.shields.io/codecov/c/github/yokha/dbop-core.svg)](https://codecov.io/gh/yokha/dbop-core)
-```
-
 ---
