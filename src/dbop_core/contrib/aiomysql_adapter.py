@@ -6,8 +6,10 @@ import string
 
 _SP_NAME = "dbop_runner"
 
+
 def _sp() -> str:
     return "dbop_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+
 
 @asynccontextmanager
 async def _cursor_cm(conn):
@@ -45,6 +47,7 @@ async def _cursor_cm(conn):
             if inspect.isawaitable(res):
                 await res
 
+
 async def _commit(conn) -> None:
     fn = getattr(conn, "commit", None)
     if fn:
@@ -52,12 +55,14 @@ async def _commit(conn) -> None:
         if inspect.isawaitable(res):
             await res
 
+
 async def _rollback(conn) -> None:
     fn = getattr(conn, "rollback", None)
     if fn:
         res = fn()
         if inspect.isawaitable(res):
             await res
+
 
 @asynccontextmanager
 async def attempt_scope_async(conn, *, read_only: bool = False):
@@ -110,7 +115,10 @@ async def attempt_scope_async(conn, *, read_only: bool = False):
                     await _rollback(conn)
             raise
 
-async def apply_timeouts_async(conn, *, lock_timeout_s: int | None, stmt_timeout_s: int | None) -> None:
+
+async def apply_timeouts_async(
+    conn, *, lock_timeout_s: int | None, stmt_timeout_s: int | None
+) -> None:
     """Best-effort per-attempt timeouts for MySQL/MariaDB."""
     async with _cursor_cm(conn) as cur:
         if lock_timeout_s is not None:

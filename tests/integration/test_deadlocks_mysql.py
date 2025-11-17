@@ -1,4 +1,3 @@
-# tests/integration/test_deadlocks_mysql.py
 from __future__ import annotations
 
 import os
@@ -165,7 +164,7 @@ def test_deadlock_is_retried_pymysql(mysql_conn_pair):
     assert not t1_exc, f"t1 worker raised: {t1_exc[0]!r}"
     assert not t2_exc, f"t2 worker raised: {t2_exc[0]!r}"
 
-    # Verify: exactly one txn succeeded → both rows incremented once
+    # Verify: exactly one txn succeeded -> both rows incremented once
     with c1.cursor() as cur:
         cur.execute("SELECT v FROM dlock WHERE id = 1")
         v1 = cur.fetchone()[0]

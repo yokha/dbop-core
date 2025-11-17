@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-11-17
+
+### Added
+
+* **Optional OpenTelemetry (OTLP) observability**
+  * New `execute_traced_optional()` helper exposed from the package.
+  * `dbop_core.otel_setup` – helpers to initialize OTEL tracer + metrics exporters
+    (HTTP or gRPC) based on `DBOP_OTEL_EXPORTER` and standard `OTEL_EXPORTER_OTLP_*`
+    env vars.
+  * `dbop_core.otel_runtime` – traced wrapper around `execute()` that emits:
+    * a parent span per logical DB operation,
+    * per-attempt spans with outcome and attributes,
+    * attributes such as `dbop.max_retries`, `dbop.initial_delay`,
+      `dbop.outcome`, `db.system`, `db.name`, …
+  * Optional Prometheus-style OTLP metrics:
+    * `dbop_attempts_total` – total attempts (including retries),
+    * `dbop_operations_total` – total logical operations,
+    * `dbop_operation_duration_seconds` – histogram of operation latency.
+
+* **Examples + Docker demo**
+  * `examples/otel-smoke/` – smoke test that drives retries and emits spans/metrics.
+  * `_compose/otel.yml` – local OTEL stack (collector + Jaeger + Prometheus + Grafana).
+  * `examples/OTEL-dashboard.json` – sample Grafana dashboard for dbop metrics.
+
+### Notes
+
+* OTEL integration is **disabled by default**.
+* Enabling requires the `otel` extra and `DBOP_OTEL_ENABLED=1`.
+* If `opentelemetry-sdk` is not installed, imports safely degrade to no-op.
+
+
 ## [1.0.0] - 2025-10-19
 
 ### Added

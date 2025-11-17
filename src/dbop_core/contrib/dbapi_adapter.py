@@ -101,5 +101,5 @@ def apply_timeouts_sync(
                 with suppress(Exception):
                     cur.execute(f"PRAGMA busy_timeout = {int(lock_timeout_s) * 1000}")
         else:
-            # Unknown backend → no-op
+            # Unknown backend -> no-op
             pass

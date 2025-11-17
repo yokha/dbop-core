@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dbop-core"
-version = "1.0.0"
+version = "1.1.0"
 description = "DB-agnostic operation runner with retries/backoff and pluggable scopes/classifiers"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -52,6 +52,12 @@ asyncio_mode = "auto"
 addopts = "-q"
 markers = [
   "integration: marks tests as integration (deselect with -m 'not integration')",
+]
+
+[tool.coverage.run]
+omit = [
+    "src/dbop_core/otel_runtime.py",
+    "src/dbop_core/otel_setup.py",
 ]
 
 [tool.ruff]
